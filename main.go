@@ -14,7 +14,6 @@ import (
 	"strconv"
 	"time"
 
-	yaml "github.com/goccy/go-yaml"
 	"github.com/progrium/darwinkit/dispatch"
 	"github.com/progrium/darwinkit/macos"
 	"github.com/progrium/darwinkit/macos/appkit"
@@ -23,67 +22,6 @@ import (
 
 // png, 32x32
 var ghPngIcon32x32 = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAABAwAAAQMB4GlWSgAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAKYSURBVFiFtZdNaxNRFIafM9pQFFdK1UXQ1DRNuyz9A6mFQndFGhAUupN+/IralW66UIQuhSyqG8Gtn6C4EioVsX5EcdWFK2PbFJMeF/cOHce5M5NkeuBwmXvPed/3Zu49cyKqSloTkePAIHARKNgR4DvwzY51VW2lBlXVRAfywAqwDWiCb9vYfCrsBOIy8AhopSAOe8vmlrsSAFSBRhfEYW8A1dQCgD5gNQPisK8CfWkE1I6A3PdarABg/gjJfZ+PFACMA81Q8E17EK8BbzsgeQdcB0rAcmitCYz7vKKqiMgx4CNQ5F+bVNWn/oOIVIEKUA84mNrg+wtVXQ/kXAaehHC/YG5H29/9jGMnpTR3OeEqlxzYM6qKZxUtEW0jjvlOzIWxBOCJyCgw4Qj6lYGAhmN+QkRGPWDWEVBT1ee9sqvqM+CBY3nWwxycKFvulTxgK475QQ/zVQvbLuakZmUfMNcvbAWPw09q0L6q6kFW7KraBj67BJyJWDibFXkC5mkP00iEbUBETmXFbLEGIpbqHrDlyCtnJSAGaytOwGKGAlxYnwDmcHc0QxmU4iHcHdUcwDDQdgT8AMZ6IB+zGFHYbWA4qgl5BbwOPO8Ct4BCB8SXgNs2N7Y58ROKwB+78Bg4gSnRwZ+ujSko9wEvglSAezbmIIZYLVcx3JCsBQJeAp7jfNyN2fliArHva1EdUR7YCQTdsPMLmLL8G3gDXIgRMJKCfIfAf4YwwCSwZwN/Auc7PHQnE8j3MF1WbFc8xWFv+B64CpwDcnaUGAH9MeRNYOq/HAfQNLDvAOrvQsA+MB2ZEwNWATYyELABVJw5Ce9UgCvAZgAwFxOfC8Rt2lznK1O1bXmSiYhg6sKAqt5JiF3AHOCHmgL8L5EXS+d81uVOAAAAAElFTkSuQmCC"
-
-type Configuration struct {
-	githubToken           string   `yaml:"github_token,omitempty"`
-	GithubRefreshInterval int      `yaml:"github_refresh_interval"`
-	ShowDrafts            bool     `yaml:"show_drafts"`
-	IgnoreRepositories    []string `yaml:"ignore_repositories"`
-	IgnorePRs             []string `yaml:"ignore_prs"`
-	ExtraQueries          []string `yaml:"extra_queries"`
-	SearchCreatedPRs      bool     `yaml:"search_created_prs"`
-	SearchReviewerPRs     bool     `yaml:"search_reviewer_prs"`
-
-	ignoreRepositoriesRegexes []*regexp.Regexp
-	ignorePRsRegexes          []*regexp.Regexp
-}
-
-func stringsToRegexes(strings []string) []*regexp.Regexp {
-	regexes := make([]*regexp.Regexp, 0, len(strings))
-	for _, ignoreRegexStr := range strings {
-		regexes = append(regexes, regexp.MustCompile(ignoreRegexStr))
-	}
-	return regexes
-}
-
-func (c Configuration) IgnoreRepositoriesRegexes() []*regexp.Regexp {
-	if c.ignoreRepositoriesRegexes == nil {
-		c.ignoreRepositoriesRegexes = stringsToRegexes(c.IgnoreRepositories)
-	}
-	return c.ignoreRepositoriesRegexes
-}
-
-func (c Configuration) IgnorePRRegexes() []*regexp.Regexp {
-	if c.ignorePRsRegexes == nil {
-		c.ignorePRsRegexes = stringsToRegexes(c.IgnorePRs)
-	}
-	return c.ignorePRsRegexes
-}
-
-func (c Configuration) GithubRefresh() time.Duration {
-	return time.Duration(c.GithubRefreshInterval) * time.Second
-}
-
-func (c Configuration) GithubToken() string {
-	if c.githubToken == "" {
-		return os.Getenv("GH_TOKEN")
-	}
-	return c.githubToken
-}
-
-func loadConfiguration(configFile string) (Configuration, error) {
-	configFileRaw, err := os.ReadFile(configFile)
-	if err != nil {
-		return Configuration{}, fmt.Errorf("error while reading configuration file %s: %w", configFile, err)
-	}
-	conf := Configuration{}
-	err = yaml.Unmarshal(configFileRaw, &conf)
-	if err != nil {
-		return Configuration{}, fmt.Errorf("error while parsing configuration file %s: %w", configFile, err)
-	}
-
-	return conf, nil
-}
 
 func main() {
 	selfPath, err := os.Executable()
@@ -101,11 +39,11 @@ func main() {
 	configurationFile := filepath.Join(userHome, ".config", "github-bar", "config.yml")
 
 	native.FNSLog("Loading configuration file at %s", configurationFile)
-	config, err := loadConfiguration(configurationFile)
+	config, err := view.LoadConfiguration(configurationFile)
 	if err != nil {
 		native.FNSLog("%e", err)
 		native.FNSLog("Loading configuration file at %s", defaultConfigurationFile)
-		config, err = loadConfiguration(defaultConfigurationFile)
+		config, err = view.LoadConfiguration(defaultConfigurationFile)
 		if err != nil {
 			native.FNSLog("%e", err)
 			panic(fmt.Errorf("error while loading default configuration file %s: %w", defaultConfigurationFile, err))
@@ -122,8 +60,35 @@ func main() {
 	})
 }
 
-func setupStatusBar(app appkit.Application, config Configuration) {
-	ghops := github.NewGithubOperations(config.GithubToken())
+func fetchPRs(ghops *github.GhOperations, config view.Configuration) ([]github.PullRequest, error) {
+	var createdPRs = make([]github.PullRequest, 0)
+	var reviewerPRs = make([]github.PullRequest, 0)
+	var prs []github.PullRequest
+	var err error
+	if config.SearchCreatedPRs {
+		createdPRs, err = ghops.CreatedOpenPRs()
+		if err != nil {
+			return nil, fmt.Errorf("error searching user created PRs: %w", err)
+		}
+	}
+	if config.SearchReviewerPRs {
+		reviewerPRs, err = ghops.ReviewerOpenPRs()
+		if err != nil {
+			return nil, fmt.Errorf("error searching PRs tagging user as reviewer: %w", err)
+		}
+	}
+	prs = append(createdPRs, reviewerPRs...)
+	for _, query := range config.ExtraQueries {
+		queriedPRs, err := ghops.SearchIssues(query)
+		if err != nil {
+			return nil, fmt.Errorf("error searching PRs matching query %s: %w", query, err)
+		}
+		prs = append(prs, queriedPRs...)
+	}
+	return prs, nil
+}
+
+func setupStatusBar(app appkit.Application, config view.Configuration) {
 	menu := appkit.NewMenuWithTitle("Open PRs")
 	objc.Retain(&menu)
 	statusItem := appkit.StatusBar_SystemStatusBar().StatusItemWithLength(appkit.VariableStatusItemLength)
@@ -138,39 +103,8 @@ func setupStatusBar(app appkit.Application, config Configuration) {
 	refreshTicker := time.NewTicker(config.GithubRefresh())
 	go func() {
 		for {
-			native.NSLog("Refreshing PRs")
-			var createdPRs = make([]github.PullRequest, 0)
-			var reviewerPRs = make([]github.PullRequest, 0)
-			var prs []github.PullRequest
-			var err error
-			if config.SearchCreatedPRs {
-				createdPRs, err = ghops.CreatedOpenPRs()
-				if err != nil {
-					native.FNSLog("Error searching user created PRs: %v", err)
-					goto endCurrentLoop
-				}
-			}
-			if config.SearchReviewerPRs {
-				reviewerPRs, err = ghops.ReviewerOpenPRs()
-				if err != nil {
-					native.FNSLog("Error searching PRs tagging user as reviewer: %v", err)
-					goto endCurrentLoop
-				}
-			}
-			prs = append(createdPRs, reviewerPRs...)
-			for _, query := range config.ExtraQueries {
-				queriedPRs, err := ghops.SearchIssues(query)
-				if err != nil {
-					native.FNSLog("Error searching PRs matching query %s: %v", query, err)
-					goto endCurrentLoop
-				}
-				prs = append(prs, queriedPRs...)
-			}
-			renderStatusMenu(app, statusItem, menu, prs, config)
-		endCurrentLoop:
-			if err != nil {
-				view.DispatchMarkBarButtonOnError(statusItem, err)
-			}
+			native.NSLog("Refreshing PRs from timer")
+			refreshMenuWithPRs(config, app, statusItem, menu)
 			select {
 			case <-refreshTicker.C:
 				continue
@@ -180,13 +114,27 @@ func setupStatusBar(app appkit.Application, config Configuration) {
 
 }
 
-func renderStatusMenu(app appkit.Application, statusItem appkit.StatusItem, menu appkit.Menu, prs []github.PullRequest, config Configuration) {
+func refreshMenuWithPRs(config view.Configuration, app appkit.Application, statusItem appkit.StatusItem, menu appkit.Menu) {
+	ghops := github.NewGithubOperations(config.GithubToken())
+	prs, err := fetchPRs(ghops, config)
+	if err == nil {
+		renderStatusMenu(app, statusItem, menu, prs, config)
+	} else {
+		view.DispatchMarkBarButtonOnError(statusItem, err)
+	}
+}
+
+func renderStatusMenu(app appkit.Application, statusItem appkit.StatusItem, menu appkit.Menu, prs []github.PullRequest, config view.Configuration) {
 	dispatch.MainQueue().DispatchAsync(func() {
 		menu.RemoveAllItems()
 		prCount := renderPRs(menu, prs, config)
 		native.FNSLog("Rendered %d out of %d PRs", prCount, len(prs))
 		menu.AddItem(view.MenuSeparator())
 		menu.AddItem(view.MenuSeparator())
+		menu.AddItem(view.MenuItem("Refresh", "r", func(sender objc.Object) {
+			native.NSLog("Refreshing PRs from button")
+			refreshMenuWithPRs(config, app, statusItem, menu)
+		}))
 		menu.AddItem(view.MenuItem("Quit", "q", func(sender objc.Object) {
 			app.Terminate(nil)
 		}))
@@ -195,7 +143,7 @@ func renderStatusMenu(app appkit.Application, statusItem appkit.StatusItem, menu
 
 }
 
-func renderPRs(menu appkit.Menu, allPRs []github.PullRequest, config Configuration) int {
+func renderPRs(menu appkit.Menu, allPRs []github.PullRequest, config view.Configuration) int {
 	prsByRepository, sortedRepositories := aggregatePRsByRepository(allPRs)
 	renderedCount := 0
 	for _, repository := range sortedRepositories {

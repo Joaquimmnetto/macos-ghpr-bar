@@ -36,15 +36,21 @@ tasks.register("createApkFolder") {
     dependsOn 'buildGoApp'
     def appRoot = Path.of(projectDir.absolutePath, "GhBar.app")
     def appContentsPath = appRoot.resolve("Contents")
-    def appBinPath = appContentsPath.resolve("MacOS")
-    def appBinFile = appBinPath.resolve("GhBar")
+    def appBinFolder = appContentsPath.resolve("MacOS")
+    def appBinFile = appBinFolder.resolve("GhBar")
+    def appConfigFile = appBinFolder.resolve("config.yml")
     def appPlistFile = appContentsPath.resolve("Info.plist")
     def binFile = file("app")
+    def configFile = file("config.yml")
     def plistFile = file("Info.plist")
+    doFirst {
+        appRoot.toFile().deleteDir()
+    }
     doLast {
         Files.createDirectories(appContentsPath)
-        Files.createDirectories(appBinPath)
+        Files.createDirectories(appBinFolder)
         Files.copy(binFile.toPath(), appBinFile, StandardCopyOption.REPLACE_EXISTING)
+        Files.copy(configFile.toPath(), appConfigFile, StandardCopyOption.REPLACE_EXISTING)
         Files.copy(plistFile.toPath(), appPlistFile, StandardCopyOption.REPLACE_EXISTING)
         Files.setPosixFilePermissions(appRoot, unix755)
     }
