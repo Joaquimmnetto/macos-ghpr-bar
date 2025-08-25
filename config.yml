@@ -1,0 +1,9 @@
+github_refresh_interval: 120
+show_drafts: false
+ignore_repositories:
+  - "^wooga/wdk-js.+$"
+ignore_prs:
+  - "^Bump\\s.+$"
+extra_queries: []
+search_created_prs: true
+search_reviewer_prs: true
