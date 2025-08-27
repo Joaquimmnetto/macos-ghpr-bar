@@ -1,10 +1,13 @@
+//go:build darwin
+// +build darwin
+
 package view
 
 import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"macos-gh-bar/native"
+	"github.com/joaquimmnetto/gh-bar-macos/native"
 	"strings"
 
 	"github.com/progrium/darwinkit/dispatch"

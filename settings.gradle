@@ -6,3 +6,8 @@
  */
 
 rootProject.name = 'macos-gh-bar'
+
+
+include ":core"
+include ":macos"
+include ":windows"

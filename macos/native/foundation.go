@@ -1,3 +1,6 @@
+//go:build darwin
+// +build darwin
+
 package native
 
 // #cgo CFLAGS: -x objective-c
@@ -10,7 +13,6 @@ package native
 import "C"
 import (
 	"fmt"
-
 	"github.com/progrium/darwinkit/macos/foundation"
 )
 
