@@ -85,7 +85,7 @@ func (ops *GhOperations) searchIssues(query string, options gh.SearchOptions) ([
 			createdPRs = append(createdPRs, PullRequest{
 				Number:     issuePR.GetNumber(),
 				Title:      issuePR.GetTitle(),
-				Author:     issuePR.GetUser().GetName(),
+				Author:     issuePR.GetUser().GetLogin(),
 				Repository: repoName,
 				URL:        issuePR.GetHTMLURL(),
 				Draft:      issuePR.GetDraft(),

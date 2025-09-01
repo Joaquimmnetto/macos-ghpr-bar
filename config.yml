@@ -1,16 +1,16 @@
 github_refresh_interval: 120
 ignore_prs:
   - repository: "^wooga/wdk-js.+$"
-  - title: "^Bump\\s.+$"
-#    author: "^dependabot.*$"
+  - author: 'dependabot.*$'
+  - title: '^\[Snyk\].+$'
+  - title: '^\[WIP\].+$'
   - draft: true
 query_groups:
-  "Created":
-    - "is:pr is:open author:@me archived:false"
   "To Review":
     - "is:pr is:open review-requested:@me archived:false"
+  "Created":
+    - "is:pr is:open author:@me archived:false"
 hide_prs:
   - repository: "^wooga/wdk-unity.+$"
-
 ensure_prs: []
 render_hidden_prs: true

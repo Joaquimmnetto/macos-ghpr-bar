@@ -3,9 +3,9 @@ package main
 import (
 	"errors"
 	"fmt"
+	"macos-gh-bar/core"
 	"macos-gh-bar/github"
 	"macos-gh-bar/native"
-	"macos-gh-bar/slices"
 	"macos-gh-bar/view"
 	"os"
 	"os/exec"
@@ -60,47 +60,6 @@ func main() {
 	})
 }
 
-type PRMenuModel struct {
-	Hidden map[string][]github.PullRequest
-	Shown  map[string][]github.PullRequest
-}
-
-func fetchPRs(ghops *github.GhOperations, config view.Configuration) (PRMenuModel, []error) {
-	prs := make(map[string][]github.PullRequest, len(config.QueryGroups))
-	var searchErrors []error
-	for category, queries := range config.QueryGroups {
-		prs[category] = make([]github.PullRequest, 0, len(queries))
-		for _, query := range queries {
-			start := time.Now()
-			queriedPRs, err := ghops.SearchIssues(query)
-			native.FNSLog("Ran Github query %s in %s", query, time.Since(start))
-
-			queriedPRs = slices.Filter(queriedPRs, func(pr github.PullRequest) bool {
-				return config.MatchIgnoredPRs(pr) == false
-			})
-			if err != nil {
-				searchErrors = append(searchErrors, fmt.Errorf("error searching PRs matching query %s: %w", query, err))
-				continue
-			}
-			prs[category] = append(prs[category], queriedPRs...)
-		}
-	}
-	prsToHide := make(map[string][]github.PullRequest, len(prs))
-	prsToShow := make(map[string][]github.PullRequest, len(prs))
-	for category, queries := range prs {
-		prsToShow[category] = make([]github.PullRequest, 0)
-		toHide, toShow := slices.Split(queries, func(pr github.PullRequest) bool {
-			return config.MatchHidePRs(pr, category)
-		})
-		prsToHide[category] = append(prsToHide[category], toHide...)
-		prsToShow[category] = append(prsToShow[category], toShow...)
-	}
-	return PRMenuModel{
-		Hidden: prsToHide,
-		Shown:  prsToShow,
-	}, searchErrors
-}
-
 func setupStatusBar(app appkit.Application, config view.Configuration) {
 	mainMenu := view.NewMenuWithTitle("Open PRs")
 	statusItem := appkit.StatusBar_SystemStatusBar().StatusItemWithLength(appkit.VariableStatusItemLength)
@@ -129,7 +88,7 @@ func setupStatusBar(app appkit.Application, config view.Configuration) {
 
 func refreshMenuWithPRs(config view.Configuration, app appkit.Application, statusItem appkit.StatusItem, mainMenu appkit.Menu) {
 	ghops := github.NewGithubOperations(config.GithubToken())
-	prsModel, err := fetchPRs(ghops, config)
+	prsModel, err := core.FetchPRs(ghops, config)
 	if err == nil {
 		renderStatusMenu(app, statusItem, mainMenu, prsModel, config)
 	} else {
@@ -137,7 +96,7 @@ func refreshMenuWithPRs(config view.Configuration, app appkit.Application, statu
 	}
 }
 
-func renderStatusMenu(app appkit.Application, statusItem appkit.StatusItem, mainMenu appkit.Menu, prs PRMenuModel, config view.Configuration) {
+func renderStatusMenu(app appkit.Application, statusItem appkit.StatusItem, mainMenu appkit.Menu, prs core.PRMenuModel, config view.Configuration) {
 	dispatch.MainQueue().DispatchAsync(func() {
 		mainMenu.RemoveAllItems()
 		prCount := renderPRs(mainMenu, prs.Shown)
@@ -145,8 +104,8 @@ func renderStatusMenu(app appkit.Application, statusItem appkit.StatusItem, main
 		mainMenu.AddItem(view.MenuSeparator())
 
 		if config.RenderHiddenPRs {
-			hiddenPRsItem := view.MenuItemNoAction("Hidden Items", "h")
-			hiddenItemsMenu := view.NewMenuWithTitle("Hidden Items")
+			hiddenPRsItem := view.MenuItemNoAction("Hidden PRs", "x")
+			hiddenItemsMenu := view.NewMenuWithTitle("Hidden PRs")
 			_ = renderPRs(hiddenItemsMenu, prs.Hidden)
 			hiddenPRsItem.SetSubmenu(hiddenItemsMenu)
 			mainMenu.AddItem(hiddenPRsItem)
