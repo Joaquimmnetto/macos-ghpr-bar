@@ -14,6 +14,7 @@ type PullRequest struct {
 	Title      string
 	URL        string
 	Repository string
+	Author     string
 	Draft      bool
 }
 
@@ -38,8 +39,7 @@ func (ops *GhOperations) GetSelf() (string, error) {
 }
 
 func (ops *GhOperations) CreatedOpenPRs() ([]PullRequest, error) {
-	prs, err := ops.searchIssues("is:pr is:open author:@me archived:false",
-		gh.SearchOptions{Sort: "updated", Order: "desc", ListOptions: gh.ListOptions{PerPage: 100}})
+	prs, err := ops.SearchIssues("is:pr is:open author:@me archived:false")
 	if err != nil {
 		return nil, fmt.Errorf("failed to find open pull requests created by the user: %e", err)
 	}
@@ -47,8 +47,7 @@ func (ops *GhOperations) CreatedOpenPRs() ([]PullRequest, error) {
 }
 
 func (ops *GhOperations) ReviewerOpenPRs() ([]PullRequest, error) {
-	prs, err := ops.searchIssues("is:pr is:open review-requested:@me archived:false",
-		gh.SearchOptions{Sort: "updated", Order: "desc", ListOptions: gh.ListOptions{PerPage: 100}})
+	prs, err := ops.SearchIssues("is:pr is:open review-requested:@me archived:false")
 	if err != nil {
 		return nil, fmt.Errorf("failed to find open pull requests assigned to the user: %e", err)
 	}
@@ -56,8 +55,7 @@ func (ops *GhOperations) ReviewerOpenPRs() ([]PullRequest, error) {
 }
 
 func (ops *GhOperations) GetAllSelfOpenPRs() ([]PullRequest, error) {
-	prs, err := ops.searchIssues("is:pr is:open (review-requested:@me or author:@me) archived:false",
-		gh.SearchOptions{Sort: "updated", Order: "desc", ListOptions: gh.ListOptions{PerPage: 100}})
+	prs, err := ops.SearchIssues("is:pr is:open (review-requested:@me or author:@me) archived:false")
 	if err != nil {
 		return nil, fmt.Errorf("failed to find open pull requests: %e", err)
 	}
@@ -87,6 +85,7 @@ func (ops *GhOperations) searchIssues(query string, options gh.SearchOptions) ([
 			createdPRs = append(createdPRs, PullRequest{
 				Number:     issuePR.GetNumber(),
 				Title:      issuePR.GetTitle(),
+				Author:     issuePR.GetUser().GetName(),
 				Repository: repoName,
 				URL:        issuePR.GetHTMLURL(),
 				Draft:      issuePR.GetDraft(),

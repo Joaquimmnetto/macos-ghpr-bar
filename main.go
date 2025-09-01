@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"macos-gh-bar/github"
 	"macos-gh-bar/native"
@@ -9,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strconv"
 	"time"
@@ -60,51 +60,64 @@ func main() {
 	})
 }
 
-func fetchPRs(ghops *github.GhOperations, config view.Configuration) ([]github.PullRequest, error) {
-	var createdPRs = make([]github.PullRequest, 0)
-	var reviewerPRs = make([]github.PullRequest, 0)
-	var prs []github.PullRequest
-	var err error
-	if config.SearchCreatedPRs {
-		createdPRs, err = ghops.CreatedOpenPRs()
-		if err != nil {
-			return nil, fmt.Errorf("error searching user created PRs: %w", err)
+type PRMenuModel struct {
+	Hidden map[string][]github.PullRequest
+	Shown  map[string][]github.PullRequest
+}
+
+func fetchPRs(ghops *github.GhOperations, config view.Configuration) (PRMenuModel, []error) {
+	prs := make(map[string][]github.PullRequest, len(config.QueryGroups))
+	var searchErrors []error
+	for category, queries := range config.QueryGroups {
+		prs[category] = make([]github.PullRequest, 0, len(queries))
+		for _, query := range queries {
+			start := time.Now()
+			queriedPRs, err := ghops.SearchIssues(query)
+			native.FNSLog("Ran Github query %s in %s", query, time.Since(start))
+
+			queriedPRs = slices.Filter(queriedPRs, func(pr github.PullRequest) bool {
+				return config.MatchIgnoredPRs(pr) == false
+			})
+			if err != nil {
+				searchErrors = append(searchErrors, fmt.Errorf("error searching PRs matching query %s: %w", query, err))
+				continue
+			}
+			prs[category] = append(prs[category], queriedPRs...)
 		}
 	}
-	if config.SearchReviewerPRs {
-		reviewerPRs, err = ghops.ReviewerOpenPRs()
-		if err != nil {
-			return nil, fmt.Errorf("error searching PRs tagging user as reviewer: %w", err)
-		}
+	prsToHide := make(map[string][]github.PullRequest, len(prs))
+	prsToShow := make(map[string][]github.PullRequest, len(prs))
+	for category, queries := range prs {
+		prsToShow[category] = make([]github.PullRequest, 0)
+		toHide, toShow := slices.Split(queries, func(pr github.PullRequest) bool {
+			return config.MatchHidePRs(pr, category)
+		})
+		prsToHide[category] = append(prsToHide[category], toHide...)
+		prsToShow[category] = append(prsToShow[category], toShow...)
 	}
-	prs = append(createdPRs, reviewerPRs...)
-	for _, query := range config.ExtraQueries {
-		queriedPRs, err := ghops.SearchIssues(query)
-		if err != nil {
-			return nil, fmt.Errorf("error searching PRs matching query %s: %w", query, err)
-		}
-		prs = append(prs, queriedPRs...)
-	}
-	return prs, nil
+	return PRMenuModel{
+		Hidden: prsToHide,
+		Shown:  prsToShow,
+	}, searchErrors
 }
 
 func setupStatusBar(app appkit.Application, config view.Configuration) {
-	menu := appkit.NewMenuWithTitle("Open PRs")
-	objc.Retain(&menu)
+	mainMenu := view.NewMenuWithTitle("Open PRs")
 	statusItem := appkit.StatusBar_SystemStatusBar().StatusItemWithLength(appkit.VariableStatusItemLength)
 	objc.Retain(&statusItem)
 
 	img := view.AppkitImageFromBase64(ghPngIcon32x32)
-	objc.Retain(&img)
 	statusItem.Button().SetImage(img)
-	statusItem.SetMenu(menu)
+	statusItem.SetMenu(mainMenu)
 	statusItem.SetVisible(true)
 
 	refreshTicker := time.NewTicker(config.GithubRefresh())
 	go func() {
 		for {
 			native.NSLog("Refreshing PRs from timer")
-			refreshMenuWithPRs(config, app, statusItem, menu)
+			start := time.Now()
+			refreshMenuWithPRs(config, app, statusItem, mainMenu)
+			native.FNSLog("Refreshed PRs in %s", time.Since(start))
 			select {
 			case <-refreshTicker.C:
 				continue
@@ -114,65 +127,62 @@ func setupStatusBar(app appkit.Application, config view.Configuration) {
 
 }
 
-func refreshMenuWithPRs(config view.Configuration, app appkit.Application, statusItem appkit.StatusItem, menu appkit.Menu) {
+func refreshMenuWithPRs(config view.Configuration, app appkit.Application, statusItem appkit.StatusItem, mainMenu appkit.Menu) {
 	ghops := github.NewGithubOperations(config.GithubToken())
-	prs, err := fetchPRs(ghops, config)
+	prsModel, err := fetchPRs(ghops, config)
 	if err == nil {
-		renderStatusMenu(app, statusItem, menu, prs, config)
+		renderStatusMenu(app, statusItem, mainMenu, prsModel, config)
 	} else {
-		view.DispatchMarkBarButtonOnError(statusItem, err)
+		view.DispatchMarkBarButtonOnError(statusItem, errors.Join(err...))
 	}
 }
 
-func renderStatusMenu(app appkit.Application, statusItem appkit.StatusItem, menu appkit.Menu, prs []github.PullRequest, config view.Configuration) {
+func renderStatusMenu(app appkit.Application, statusItem appkit.StatusItem, mainMenu appkit.Menu, prs PRMenuModel, config view.Configuration) {
 	dispatch.MainQueue().DispatchAsync(func() {
-		menu.RemoveAllItems()
-		prCount := renderPRs(menu, prs, config)
-		native.FNSLog("Rendered %d out of %d PRs", prCount, len(prs))
-		menu.AddItem(view.MenuSeparator())
-		menu.AddItem(view.MenuSeparator())
-		menu.AddItem(view.MenuItem("Refresh", "r", func(sender objc.Object) {
+		mainMenu.RemoveAllItems()
+		prCount := renderPRs(mainMenu, prs.Shown)
+		mainMenu.AddItem(view.MenuSeparator())
+		mainMenu.AddItem(view.MenuSeparator())
+
+		if config.RenderHiddenPRs {
+			hiddenPRsItem := view.MenuItemNoAction("Hidden Items", "h")
+			hiddenItemsMenu := view.NewMenuWithTitle("Hidden Items")
+			_ = renderPRs(hiddenItemsMenu, prs.Hidden)
+			hiddenPRsItem.SetSubmenu(hiddenItemsMenu)
+			mainMenu.AddItem(hiddenPRsItem)
+		}
+
+		mainMenu.AddItem(view.MenuItem("Refresh", "r", func(sender objc.Object) {
 			native.NSLog("Refreshing PRs from button")
-			refreshMenuWithPRs(config, app, statusItem, menu)
+			refreshMenuWithPRs(config, app, statusItem, mainMenu)
 		}))
-		menu.AddItem(view.MenuItem("Quit", "q", func(sender objc.Object) {
+		mainMenu.AddItem(view.MenuItem("Quit", "q", func(sender objc.Object) {
 			app.Terminate(nil)
 		}))
 		statusItem.Button().SetTitle(strconv.Itoa(prCount))
 	})
-
 }
 
-func renderPRs(menu appkit.Menu, allPRs []github.PullRequest, config view.Configuration) int {
-	prsByRepository, sortedRepositories := aggregatePRsByRepository(allPRs)
+func renderPRs(menu appkit.Menu, categoryPrs map[string][]github.PullRequest) int {
 	renderedCount := 0
-	for _, repository := range sortedRepositories {
-		prs := prsByRepository[repository]
-		prs = slices.Filter(prs, func(pr github.PullRequest) bool {
-			if !config.ShowDrafts && pr.Draft {
-				return false
+	for category, prs := range categoryPrs {
+		menu.AddItem(view.MenuSeparator())
+		menu.AddItem(view.MenuItemSectionLabel(category))
+		menu.AddItem(view.MenuSeparator())
+		prsByRepository, sortedRepositories := aggregatePRsByRepository(prs)
+		for _, repository := range sortedRepositories {
+			prs := prsByRepository[repository]
+			if len(prs) == 0 {
+				continue
 			}
-			ignore := slices.Any(config.IgnoreRepositoriesRegexes(), func(regex *regexp.Regexp) bool { return regex.MatchString(pr.Repository) }) ||
-				slices.Any(config.IgnorePRRegexes(), func(regex *regexp.Regexp) bool { return regex.MatchString(pr.Title) })
-			if ignore {
-				return false
+			menu.AddItem(view.MenuItemSubsectionLabel(repository))
+			for _, pr := range prs {
+				renderedCount = renderedCount + 1
+				item := prMenuItem(pr)
+				menu.AddItem(item)
 			}
-			return true
-		})
-		if len(prs) == 0 {
-			continue
 		}
 		menu.AddItem(view.MenuSeparator())
-		repositoryLabel := appkit.NewMenuItem()
-		repositoryLabel.SetEnabled(false)
-		repositoryLabel.SetView(view.SubsectionTitleLabel(repository))
-		objc.Retain(&repositoryLabel)
-		menu.AddItem(repositoryLabel)
-		for _, pr := range prs {
-			renderedCount = renderedCount + 1
-			item := prMenuItem(pr)
-			menu.AddItem(item)
-		}
 	}
 	return renderedCount
 }

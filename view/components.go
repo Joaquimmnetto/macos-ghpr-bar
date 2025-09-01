@@ -14,16 +14,33 @@ import (
 	"github.com/progrium/darwinkit/objc"
 )
 
-func MenuItem(title string, charCode string, handler action.Handler) appkit.MenuItem {
-	item := appkit.NewMenuItemWithAction(title, charCode, handler)
-	objc.Retain(&item)
-	return item
+func MenuItemSectionLabel(title string) appkit.MenuItem {
+	label := appkit.NewMenuItem()
+	label.SetEnabled(false)
+	label.SetView(SectionTitleLabel(title))
+	objc.Retain(&label)
+	return label
 }
 
-func MenuSeparator() appkit.MenuItem {
-	sep := appkit.MenuItem_SeparatorItem()
-	objc.Retain(&sep)
-	return sep
+func SectionTitleLabel(title string) appkit.TextField {
+	label := appkit.NewLabel(title) // returns a TextField styled as a label
+	label.SetBezeled(false)
+	label.SetDrawsBackground(false) // transparent background
+	label.SetEditable(false)        // not editable
+	label.SetSelectable(false)      // not selectable
+	label.SetAlignment(appkit.CenterTextAlignment)
+	label.SetFont(appkit.FontClass.SystemFontOfSizeWeight(13, appkit.FontWeightBold))
+	label.SetTextColor(appkit.Color_GrayColor())
+	label.SizeToFit()
+	return label
+}
+
+func MenuItemSubsectionLabel(title string) appkit.MenuItem {
+	label := appkit.NewMenuItem()
+	label.SetEnabled(false)
+	label.SetView(SubsectionTitleLabel(title))
+	objc.Retain(&label)
+	return label
 }
 
 func SubsectionTitleLabel(title string) appkit.TextField {
@@ -35,7 +52,26 @@ func SubsectionTitleLabel(title string) appkit.TextField {
 	label.SetAlignment(appkit.CenterTextAlignment)
 	label.SetFont(appkit.FontClass.SystemFontOfSize(13))
 	label.SetTextColor(appkit.Color_GrayColor())
+	label.SizeToFit()
 	return label
+}
+
+func MenuItemNoAction(title string, charCode string) appkit.MenuItem {
+	item := appkit.NewMenuItemWithAction(title, charCode, func(sender objc.Object) {})
+	objc.Retain(&item)
+	return item
+}
+
+func MenuItem(title string, charCode string, handler action.Handler) appkit.MenuItem {
+	item := appkit.NewMenuItemWithAction(title, charCode, handler)
+	objc.Retain(&item)
+	return item
+}
+
+func MenuSeparator() appkit.MenuItem {
+	sep := appkit.MenuItem_SeparatorItem()
+	objc.Retain(&sep)
+	return sep
 }
 
 func joinErrorMessages(err error, sep string) string {
@@ -99,5 +135,12 @@ func AppkitImageFromBase64(base64String string) appkit.Image {
 		Width:  20,
 		Height: 20,
 	}) // Set the size to 20x20
+	objc.Retain(&image)
 	return image
+}
+
+func NewMenuWithTitle(title string) appkit.Menu {
+	menu := appkit.NewMenuWithTitle(title)
+	objc.Retain(&menu)
+	return menu
 }
