@@ -75,8 +75,12 @@ func setupStatusBar(app appkit.Application, config view.Configuration) {
 		for {
 			native.NSLog("Refreshing PRs from timer")
 			start := time.Now()
-			refreshMenuWithPRs(config, app, statusItem, mainMenu)
-			native.FNSLog("Refreshed PRs in %s", time.Since(start))
+			err := refreshMenuWithPRs(config, app, statusItem, mainMenu)
+			if err != nil {
+				native.FNSLog("Error refreshing PRs: %e", err)
+			} else {
+				native.FNSLog("Refreshed PRs in %s", time.Since(start))
+			}
 			select {
 			case <-refreshTicker.C:
 				continue
@@ -86,18 +90,21 @@ func setupStatusBar(app appkit.Application, config view.Configuration) {
 
 }
 
-func refreshMenuWithPRs(config view.Configuration, app appkit.Application, statusItem appkit.StatusItem, mainMenu appkit.Menu) {
-	ghops := github.NewGithubOperations(config.GithubToken())
-	prsModel, err := core.FetchPRs(ghops, config)
+func refreshMenuWithPRs(config view.Configuration, app appkit.Application, statusItem appkit.StatusItem, mainMenu appkit.Menu) error {
+	ghops := github.NewGithubOperations(config.ResolveGithubToken())
+	prsModel, errs := core.FetchPRs(ghops, config)
+	err := errors.Join(errs...)
 	if err == nil {
 		renderStatusMenu(app, statusItem, mainMenu, prsModel, config)
 	} else {
-		view.DispatchMarkBarButtonOnError(statusItem, errors.Join(err...))
+		view.DispatchMarkBarButtonOnError(statusItem, err)
 	}
+	return err
 }
 
 func renderStatusMenu(app appkit.Application, statusItem appkit.StatusItem, mainMenu appkit.Menu, prs core.PRMenuModel, config view.Configuration) {
-	dispatch.MainQueue().DispatchAsync(func() {
+	native.FNSLog("Rendering status menu")
+	dispatch.MainQueue().DispatchSync(func() {
 		mainMenu.RemoveAllItems()
 		prCount := renderPRs(mainMenu, prs.Shown)
 		mainMenu.AddItem(view.MenuSeparator())
@@ -135,9 +142,11 @@ func renderPRs(menu appkit.Menu, categoryPrs map[string][]github.PullRequest) in
 			if len(prs) == 0 {
 				continue
 			}
+			native.FNSLog("render repository %s with %d PRs", repository, len(prs))
 			menu.AddItem(view.MenuItemSubsectionLabel(repository))
 			for _, pr := range prs {
 				renderedCount = renderedCount + 1
+				native.FNSLog("render PR %d", pr.Number)
 				item := prMenuItem(pr)
 				menu.AddItem(item)
 			}

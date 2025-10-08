@@ -74,7 +74,7 @@ func (filter PRFilter) MatchWithCategory(pr github.PullRequest, category string)
 }
 
 type Configuration struct {
-	githubToken           string              `yaml:"github_token,omitempty"`
+	GithubToken           string              `yaml:"github_token"`
 	GithubRefreshInterval int                 `yaml:"github_refresh_interval"`
 	ShowDrafts            bool                `yaml:"show_drafts"`
 	IgnorePRs             []PRFilter          `yaml:"ignore_prs"`
@@ -93,11 +93,11 @@ func (c Configuration) GithubRefresh() time.Duration {
 	return time.Duration(c.GithubRefreshInterval) * time.Second
 }
 
-func (c Configuration) GithubToken() string {
-	if c.githubToken == "" {
+func (c Configuration) ResolveGithubToken() string {
+	if c.GithubToken == "" {
 		return os.Getenv("GH_TOKEN")
 	}
-	return c.githubToken
+	return c.GithubToken
 }
 
 func (c Configuration) MatchHidePRs(pr github.PullRequest, category string) bool {
