@@ -31,29 +31,6 @@ func FetchPRs(ghops *github.GhOperations, config view.Configuration) (PRMenuMode
 		})
 		return categoryPRs
 	})
-	/*
-		var categoryWg sync.WaitGroup
-		for category, queries := range config.QueryGroups {
-		categoryWg.Add(1)
-		go func() {
-			defer categoryWg.Done()
-			queryPRs := slices.ParallelMany(queries, func(query string) []github.PullRequest {
-				start := time.Now()
-				queriedPRs, err := ghops.SearchIssues(query)
-				native.FNSLog("Ran Github query %s in %s", query, time.Since(start))
-				queriedPRs = slices.Filter(queriedPRs, func(pr github.PullRequest) bool {
-					return config.MatchIgnoredPRs(pr) == false
-				})
-				if err != nil {
-					searchErrors = append(searchErrors, fmt.Errorf("error searching PRs matching query %s: %w", query, err))
-				}
-				return queriedPRs
-			})
-			prs[category] = queryPRs
-		}()
-
-		categoryWg.Wait()
-	*/
 	prsToHide := make(map[string][]github.PullRequest, len(prs))
 	prsToShow := make(map[string][]github.PullRequest, len(prs))
 	for category, queries := range prs {

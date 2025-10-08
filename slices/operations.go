@@ -19,7 +19,7 @@ func MapParallelMany[K comparable, V any, R any](items map[K]V, operation func(K
 }
 
 func ParallelMany[T any, R any](items []T, operation func(T) []R) []R {
-	result := make([]R, len(items))
+	result := make([]R, 0, len(items))
 	var queriesWg sync.WaitGroup
 	for _, item := range items {
 		queriesWg.Add(1)

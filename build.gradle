@@ -56,3 +56,13 @@ tasks.register("createApkFolder") {
     }
 }
 
+tasks.register("installApk", Copy) {
+    dependsOn 'createApkFolder'
+    doFirst {
+        def target = Path.of(System.getProperty("user.home"), "Applications", "GhBar.app").toFile()
+        target.deleteDir()
+        logger.info "Installing to ${target.absolutePath}"
+    }
+    from "${projectDir.absolutePath}/GhBar.app"
+    into "~/Applications/GhBar.app"
+}

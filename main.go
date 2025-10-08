@@ -128,6 +128,7 @@ func renderPRs(menu appkit.Menu, categoryPrs map[string][]github.PullRequest) in
 		menu.AddItem(view.MenuSeparator())
 		menu.AddItem(view.MenuItemSectionLabel(category))
 		menu.AddItem(view.MenuSeparator())
+		native.FNSLog("Rendering category %s with %d PRs", category, len(prs))
 		prsByRepository, sortedRepositories := aggregatePRsByRepository(prs)
 		for _, repository := range sortedRepositories {
 			prs := prsByRepository[repository]
