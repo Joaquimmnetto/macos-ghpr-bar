@@ -92,7 +92,14 @@ def registerGoArchBuild = { String taskName, String targetGoArch, Provider<Regul
     tasks.register(taskName, Exec) {
         group = "build"
         description = "Build GhBar for darwin/${targetGoArch} (CGO)"
-        inputs.file(file("main.go"))
+        inputs.files(java.nio.file.Files.walk(projectDir.toPath())
+                .filter { Files.isRegularFile(it)}
+                .filter { it.toString().endsWith(".go") }
+                .map    {it.toAbsolutePath().toFile() }
+                .toList()
+        )
+        inputs.file(file("go.mod"))
+        inputs.file(file("go.sum"))
         outputs.file(outputBin)
         doFirst {
             Files.createDirectories(outputBin.get().asFile.parentFile.toPath())
@@ -218,7 +225,7 @@ tasks.register("buildAppIcon") {
     }
 }
 
-tasks.register("createApkFolder") {
+tasks.register("createAppFolder") {
     dependsOn 'buildGoApp', 'buildAppIcon'
     def appRoot = Path.of(projectDir.absolutePath, "GhBar.app")
     def appContentsPath = appRoot.resolve("Contents")
@@ -248,7 +255,7 @@ tasks.register("createApkFolder") {
 }
 
 tasks.register("signApp", Exec) {
-    dependsOn 'createApkFolder'
+    dependsOn 'createAppFolder'
     def appRoot = Path.of(projectDir.absolutePath, "GhBar.app").toString()
     def entitlementsFile = file("${projectDir.absolutePath}/entitlements.plist")
     def identity = project.findProperty("signingIdentity") ?: "-"
@@ -269,58 +276,8 @@ tasks.register("signApp", Exec) {
     }
 }
 
-tasks.register("createDmg") {
-    dependsOn 'createApkFolder'
-
-    def volName = "GhBar"
-    def appRoot = file("${projectDir}/GhBar.app")
-    def stagingDir = layout.buildDirectory.file("dmg-staging").get().asFile
-    def tmpDmg = layout.buildDirectory.file("GhBar-tmp.dmg").get().asFile
-    def outputDmg = file("${projectDir}/GhBar.dmg")
-
-    doLast {
-        def execOps = services.get(ExecOperations)
-
-        stagingDir.deleteDir()
-        stagingDir.mkdirs()
-        tmpDmg.delete()
-        outputDmg.delete()
-
-        execOps.exec { spec -> spec.commandLine 'cp', '-R', appRoot.absolutePath, "${stagingDir}/" }
-        execOps.exec { spec -> spec.commandLine 'ln', '-s', '/Applications', "${stagingDir}/Applications" }
-
-        execOps.exec { spec ->
-            spec.commandLine 'hdiutil', 'create',
-                '-volname', volName,
-                '-srcfolder', stagingDir.absolutePath,
-                '-ov', '-format', 'UDRW',
-                tmpDmg.absolutePath
-        }
-
-        execOps.exec { spec ->
-            spec.commandLine 'hdiutil', 'attach', '-readwrite', '-noverify', '-noautoopen',
-                tmpDmg.absolutePath
-        }
-
-        execOps.exec { spec -> spec.commandLine 'hdiutil', 'detach', "/Volumes/${volName}" }
-
-        execOps.exec { spec ->
-            spec.commandLine 'hdiutil', 'convert',
-                tmpDmg.absolutePath,
-                '-format', 'UDZO',
-                '-imagekey', 'zlib-level=9',
-                '-o', outputDmg.absolutePath
-        }
-
-        tmpDmg.delete()
-        stagingDir.deleteDir()
-
-        logger.lifecycle "DMG created: ${outputDmg.absolutePath}"
-    }
-}
-
-tasks.register("installApk", Copy) {
-    dependsOn 'createApkFolder'
+tasks.register("installApp", Copy) {
+    dependsOn 'createAppFolder'
     doFirst {
         def target = Path.of(System.getProperty("user.home"), "Applications", "GhBar.app").toFile()
         target.deleteDir()
