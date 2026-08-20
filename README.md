@@ -59,16 +59,15 @@ Logs go to the macOS unified log (Console.app, filter by process name).
 
 ## Build and install the app
 
-Gradle tasks chain: `buildGoApp` → `buildAppIcon` → `createApkFolder` → optional `signApp` /
+Gradle tasks chain: `buildGoApp` → `buildAppIcon` → `createAppFolder` → optional `signApp` /
 `createDmg`.
 
-| Task | Purpose |
-|------|---------|
-| `./gradlew buildGoApp` | Compile Go binary to `./app` |
-| `./gradlew createApkFolder` | Assemble `GhBar.app` in the project root |
-| `./gradlew installApk` | Copy `GhBar.app` to `~/Applications/` |
-| `./gradlew signApp` | Code-sign the bundle (hardened runtime + entitlements) |
-| `./gradlew createDmg` | Produce `GhBar.dmg` |
+| Task                        | Purpose                                                                     |
+|-----------------------------|-----------------------------------------------------------------------------|
+| `./gradlew buildGoApp`      | Compile Go binary to `./app`                                                |
+| `./gradlew createAppFolder` | Assemble `GhBar.app` in the project root                                    |
+| `./gradlew installApp`      | Copy `GhBar.app` to `~/Applications/`, tries to install it as a startup app |
+| `./gradlew signApp`         | Code-sign the bundle (hardened runtime + entitlements)                      |
 
 ### Architecture
 
@@ -96,8 +95,6 @@ Ad-hoc signing is used if you do not pass an identity:
 ./gradlew signApp -PsigningIdentity='Developer ID Application: Your Name (TEAMID)'
 ```
 
-Distribution to other Macs also requires Apple notarization; see
-[`PACKAGING_DIAGNOSTIC.md`](PACKAGING_DIAGNOSTIC.md) for remaining packaging gaps.
 
 ## Project layout
 

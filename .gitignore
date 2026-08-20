@@ -8,3 +8,5 @@ build
 *.app
 app
 GhBar*
+*.md
+!README.md
