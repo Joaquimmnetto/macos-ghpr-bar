@@ -278,11 +278,37 @@ tasks.register("signApp", Exec) {
 
 tasks.register("installApp", Copy) {
     dependsOn 'createAppFolder'
+    def installedAppPath = Path.of(System.getProperty("user.home"), "Applications", "GhBar.app")
     doFirst {
-        def target = Path.of(System.getProperty("user.home"), "Applications", "GhBar.app").toFile()
-        target.deleteDir()
-        logger.info "Installing to ${target.absolutePath}"
+        installedAppPath.toFile().deleteDir()
+        logger.info "Installing to ${installedAppPath.toAbsolutePath()}"
     }
     from "${projectDir.absolutePath}/GhBar.app"
     into "~/Applications/GhBar.app"
+    doLast {
+        def appPath = installedAppPath.toAbsolutePath().toString()
+        def escapedPath = appPath.replace('\\', '\\\\').replace('"', '\\"')
+        def script = """tell application "System Events"
+    set appPath to "${escapedPath}"
+    repeat with li in login items
+        if path of li is appPath then delete li
+    end repeat
+    make login item at end with properties {path:appPath, hidden:false}
+end tell"""
+        def execOps = services.get(ExecOperations)
+        def result = execOps.exec { spec ->
+            spec.commandLine 'osascript', '-e', script
+            spec.ignoreExitValue = true
+        }
+        if (result.exitValue == 0) {
+            logger.lifecycle "Added GhBar to Login Items (open at login)"
+        } else {
+            logger.lifecycle (
+                "Could not add GhBar to Login Items (osascript exit ${result.exitValue}). " +
+                "Grant Automation access for this terminal under System Settings → Privacy & Security → Automation, " +
+                "or add ${appPath} manually under General → Login Items."
+            )
+            throw new IllegalStateException("Could not add GhBar to Login Items (osascript exit ${result.exitValue}).")
+        }
+    }
 }

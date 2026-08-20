@@ -1,6 +1,9 @@
 # GhBar
 
-macOS menu bar app that lists your open GitHub pull requests. It runs as an accessory app (no Dock icon): click the GitHub mark in the menu bar to browse PRs grouped by your config, open them in the browser, refresh on a timer, or quit.
+macOS menu bar app that lists your open GitHub pull requests. It runs as an accessory app (no
+Dock icon): click the GitHub mark in the menu bar to browse PRs grouped by your config, open
+them in the browser, refresh on a timer, or quit. If a refresh fails, the menu bar title gets a
+`❗` suffix and a "Show last error" item appears so you can see what went wrong.
 
 ## Requirements
 
@@ -19,7 +22,8 @@ GhBar loads config in this order:
 GitHub authentication:
 
 - Set `github_token` in YAML, or
-- Leave it empty and export **`GH_TOKEN`** (recommended so the token is not stored in the bundle)
+- Leave it empty and export **`GH_TOKEN`** (recommended so the token is not stored in the
+  bundle)
 
 Example `config.yml` (see the repo file for a full sample):
 
@@ -33,9 +37,16 @@ query_groups:
 ignore_prs:
   - author: 'dependabot.*$'
   - draft: true
+hide_prs:
+  - category: '^Created$'
+    draft: true
+render_hidden_prs: true
 ```
 
-`query_groups` defines menu sections and GitHub search queries. `ignore_prs` / `hide_prs` use regex filters on title, author, repository, draft, and category.
+`query_groups` defines menu sections and GitHub search queries. `ignore_prs` drops matching PRs
+entirely (regex filters on title, author, repository, draft); `hide_prs` additionally supports
+a `category` regex and tucks matches into a "Hidden PRs" submenu instead of dropping them — set
+`render_hidden_prs: false` to drop that submenu.
 
 ## Run from source
 
@@ -48,7 +59,8 @@ Logs go to the macOS unified log (Console.app, filter by process name).
 
 ## Build and install the app
 
-Gradle tasks chain: `buildGoApp` → `buildAppIcon` → `createApkFolder` → optional `signApp` / `createDmg`.
+Gradle tasks chain: `buildGoApp` → `buildAppIcon` → `createApkFolder` → optional `signApp` /
+`createDmg`.
 
 | Task | Purpose |
 |------|---------|
@@ -84,11 +96,13 @@ Ad-hoc signing is used if you do not pass an identity:
 ./gradlew signApp -PsigningIdentity='Developer ID Application: Your Name (TEAMID)'
 ```
 
-Distribution to other Macs also requires Apple notarization; see [`PACKAGING_DIAGNOSTIC.md`](PACKAGING_DIAGNOSTIC.md) for remaining packaging gaps.
+Distribution to other Macs also requires Apple notarization; see
+[`PACKAGING_DIAGNOSTIC.md`](PACKAGING_DIAGNOSTIC.md) for remaining packaging gaps.
 
 ## Project layout
 
 - `main.go`, `core/`, `github/`, `view/` — application logic and UI
+- `slices/` — generic parallel-map/filter helpers used to fan out GitHub queries per category
 - `native/` — small CGO bridge to Foundation logging
 - `Info.plist`, `entitlements.plist`, `assets/AppIcon.png` — bundle metadata and icon source
 - `build.gradle` — Go build, icon, app bundle, DMG, install
