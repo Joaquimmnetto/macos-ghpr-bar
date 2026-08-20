@@ -66,6 +66,7 @@ func setupStatusBar(app appkit.Application, config view.Configuration) {
 	objc.Retain(&statusItem)
 
 	img := view.AppkitImageFromBase64(ghPngIcon32x32)
+	img.SetTemplate(true)
 	statusItem.Button().SetImage(img)
 	statusItem.SetMenu(mainMenu)
 	statusItem.SetVisible(true)

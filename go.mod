@@ -9,3 +9,5 @@ require (
 )
 
 require github.com/google/go-querystring v1.1.0 // indirect
+
+replace github.com/progrium/darwinkit => github.com/pmoust/darwinkit v0.5.1-0.20260729123318-0a368ccd4ca9
