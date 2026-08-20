@@ -6,14 +6,19 @@
     <string>GhBar</string>
     <key>CFBundleDisplayName</key>
     <string>GhBar</string>
+    <key>CFBundleExecutable</key>
+    <string>GhBar</string>
     <key>CFBundleIdentifier</key>
-    <string>com.example.macos-gh-bar</string>
+    <string>@ghBarBundleIdentifier@</string>
+    <key>CFBundleShortVersionString</key>
+    <string>@ghBarVersion@</string>
     <key>CFBundleVersion</key>
-    <string>1.0</string>
+    <string>@ghBarBuildVersion@</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>LSUIElement</key>
     <true/>
 </dict>
 </plist>
-
